@@ -19,7 +19,71 @@
 
 namespace nb = nanobind;
 
+nb::object record_batch_test()
+{
+    arrow::Status status;
+    arrow::DoubleBuilder double_builder;
 
+    double a1[5] = {1.0,2.0,3.0,4.0,5.0};
+    status = double_builder.AppendValues(a1, 5);
+
+    if (!status.ok()){
+        return nb::none();
+    }
+
+    std::shared_ptr<arrow::Array> array1;
+    auto result = double_builder.Finish();
+
+    if (!result.ok()){
+        return nb::none();
+    }
+
+    array1 = std::move(result.ValueUnsafe());
+
+    double_builder.Reset();
+
+    double a2[4] = {3.6,4.2,3.4,4.2};
+
+    status = double_builder.AppendValues(a2, 4);
+    std::shared_ptr<arrow::Array> array2;
+    status = double_builder.AppendNull();
+    result = double_builder.Finish();
+
+    if(!result.ok()){
+        return nb::none();
+    }
+
+    array2 = std::move(result.ValueUnsafe());
+
+    std::shared_ptr<arrow::Field> field_a, field_b;
+    std::shared_ptr<arrow::Schema> schema;
+
+    field_a = arrow::field("A", arrow::float64());
+    field_b = arrow::field("B", arrow::float64());
+
+    std::vector<std::shared_ptr<arrow::Field>> field_vector;
+
+    field_vector.push_back(field_a);
+    field_vector.push_back(field_b);
+
+    schema = arrow::schema(field_vector);
+
+    std::shared_ptr<arrow::RecordBatch> rbatch;
+
+    arrow::ArrayVector av;
+
+    av.push_back(array1);
+    av.push_back(array2);
+
+    rbatch = arrow::RecordBatch::Make(schema, 5, av);
+
+    std::cout << rbatch->ToString() << std::endl;
+
+    PyObject* object = arrow::py::wrap_batch(rbatch);
+
+    return nb::steal<nb::object>(object);
+
+}
 
 nb::object dw(){
     arrow::py::import_pyarrow();
@@ -179,6 +243,7 @@ float square(float x) { return x * x; }
 NB_MODULE(nanobind_example, m) {
     m.def("square", &square);
     m.def("dw", &dw);
+    m.def("record_batch_test" , &record_batch_test);
 }
 
 
